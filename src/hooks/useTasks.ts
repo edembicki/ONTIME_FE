@@ -6,6 +6,27 @@ type UseTasksOptions = {
   userId?: string | null;
 };
 
+function normalizeTask(t: any) {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description ?? null,
+    project: t.project ?? null,
+    billable: !!t.billable,
+
+    // 🔥 ISSO AQUI É O BUG
+    status: t.status ?? 'backlog',
+
+    defaultDuration:
+      t.default_duration ?? t.defaultDuration ?? '8h',
+
+    userId: t.user_id ?? t.userId,
+
+    created_at: t.created_at,
+    updated_at: t.updated_at,
+  };
+}
+
 export function useTasks(options?: UseTasksOptions) {
   const userId = options?.userId ?? null;
 
@@ -13,7 +34,7 @@ export function useTasks(options?: UseTasksOptions) {
   const [loading, setLoading] = useState(false);
 
   /**
-   * 🔄 Carrega tasks do backend (filtrando por perfil)
+   * 🔄 Load
    */
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,14 +50,7 @@ export function useTasks(options?: UseTasksOptions) {
         ? data.rows
         : [];
 
-      // ✅ normaliza campos vindos do backend
-      const normalized = rows.map((t: any) => ({
-        ...t,
-        userId: t.userId ?? t.user_id,
-        defaultDuration: t.defaultDuration ?? t.default_duration,
-      }));
-
-      setTasks(normalized);
+      setTasks(rows.map(normalizeTask));
     } catch (e) {
       console.error('Erro ao carregar tasks', e);
       setTasks([]);
@@ -46,18 +60,18 @@ export function useTasks(options?: UseTasksOptions) {
   }, [userId]);
 
   /**
-   * ➕ Cria task (sempre vinculada ao perfil ativo)
+   * ➕ Create
    */
   const create = useCallback(
     async (task: any) => {
       if (!userId) {
-        console.warn('create task sem userId');
+        console.warn('create abortado: userId ausente');
         return;
       }
 
       await api.post('/tasks', {
         ...task,
-        userId,
+        userId, // ✅ O BACKEND ESPERA ISSO
       });
 
       await load();
@@ -66,18 +80,15 @@ export function useTasks(options?: UseTasksOptions) {
   );
 
   /**
-   * ✏️ Atualiza task (mantém o perfil)
+   * ✏️ Update
    */
   const update = useCallback(
     async (id: string, task: any) => {
-      if (!userId) {
-        console.warn('update task sem userId');
-        return;
-      }
+      if (!id || !userId) return;
 
       await api.put(`/tasks/${id}`, {
         ...task,
-        userId,
+        userId, // ✅ O BACKEND ESPERA ISSO
       });
 
       await load();
@@ -86,21 +97,24 @@ export function useTasks(options?: UseTasksOptions) {
   );
 
   /**
-   * 🗑️ Remove task
+   * 🗑️ Remove
    */
   const remove = useCallback(
     async (id: string) => {
-      await api.delete(`/tasks/${id}`);
-      await load();
+      if (!id) return;
+
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+
+      try {
+        await api.delete(`/tasks/${id}`);
+      } catch (e) {
+        console.error('Erro ao deletar task', e);
+        await load();
+      }
     },
     [load]
   );
 
-  /**
-   * 🔁 Recarrega quando:
-   * - perfil muda
-   * - hook monta
-   */
   useEffect(() => {
     load();
   }, [load]);

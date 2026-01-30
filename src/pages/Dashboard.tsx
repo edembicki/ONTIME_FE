@@ -16,8 +16,10 @@ import {
 } from 'antd';
 import { useState, useMemo, useEffect } from 'react';
 import dayjs from 'dayjs';
+
 import { useTasks } from '../hooks/useTasks';
 import { useReports } from '../hooks/useReports';
+import { useTimeEntries } from '../hooks/useTimeEntries';
 import { TimesheetCalendar } from '../components/TimesheetCalendar';
 import { TaskModal } from '../components/TaskModal';
 
@@ -31,82 +33,68 @@ const PROFILES = [
   { id: 'eduardo', label: 'Eduardo' },
 ];
 
-/**
- * =========================
- * Helper: download base64
- * =========================
- */
-function downloadBase64(
-  base64: string,
-  mime: string,
-  filename: string
-) {
-  const link = document.createElement('a');
-  link.href = `data:${mime};base64,${base64}`;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
 export default function Dashboard() {
-  const { tasks, create, update, remove } = useTasks();
+  const [activeUser, setActiveUser] = useState('eduardo');
 
+  /* ================= TASKS ================= */
+  const {
+    tasks,
+    create,
+    update,
+    remove,
+    reload: reloadTasks,
+  } = useTasks({ userId: activeUser });
+
+  /* =============== TIME ENTRIES ============== */
+  const {
+    entries,
+    create: createEntry,
+    remove: removeEntry,
+    reload: reloadEntries,
+  } = useTimeEntries(activeUser);
+
+  /* ================= REPORTS ================= */
   const {
     send: sendReport,
     loading: sendingReport,
     lastResult,
-    clearLastResult, // 🔥 NOVO
+    clearLastResult,
   } = useReports();
 
-  const [activeUser, setActiveUser] = useState('eduardo');
-
+  /* ================= UI ================= */
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any | null>(null);
-
-  const [isReportModalOpen, setIsReportModalOpen] =
-    useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportForm] = Form.useForm();
 
-  /**
-   * =========================
-   * TASKS DO PERFIL
-   * =========================
-   */
-  const userTasks = useMemo(
-    () => tasks.filter((t) => t.user_id === activeUser),
+  /* ============== BACKLOG TASKS ============== */
+  const backlogTasks = useMemo(
+    () =>
+      tasks.filter(
+        (t) => t.userId === activeUser && t.status === 'backlog'
+      ),
     [tasks, activeUser]
   );
 
-  /**
-   * =========================
-   * DOWNLOAD AUTOMÁTICO (APENAS APÓS ENVIO)
-   * =========================
-   */
+  /* =========== AUTO DOWNLOAD REPORT =========== */
   useEffect(() => {
     if (!lastResult) return;
 
     if (lastResult.files?.pdfBase64) {
-      downloadBase64(
-        lastResult.files.pdfBase64,
-        'application/pdf',
-        `timesheet-${lastResult.id}.pdf`
-      );
+      const a = document.createElement('a');
+      a.href = `data:application/pdf;base64,${lastResult.files.pdfBase64}`;
+      a.download = `timesheet-${lastResult.id}.pdf`;
+      a.click();
     }
 
     if (lastResult.files?.csvBase64) {
-      downloadBase64(
-        lastResult.files.csvBase64,
-        'text/csv',
-        `timesheet-${lastResult.id}.csv`
-      );
+      const a = document.createElement('a');
+      a.href = `data:text/csv;base64,${lastResult.files.csvBase64}`;
+      a.download = `timesheet-${lastResult.id}.csv`;
+      a.click();
     }
 
-    message.success(
-      `Relatório enviado para ${lastResult.destinationEmail}`
-    );
-
-    // 🔥 LIMPA RESULTADO PARA NÃO REEXECUTAR
+    message.success('Relatório enviado');
     clearLastResult();
   }, [lastResult, clearLastResult]);
 
@@ -133,12 +121,9 @@ export default function Dashboard() {
               }
               extra={
                 <Space>
-                  <Button
-                    onClick={() => setIsReportModalOpen(true)}
-                  >
+                  <Button onClick={() => setIsReportModalOpen(true)}>
                     Enviar para SevenSys
                   </Button>
-
                   <Button
                     type="primary"
                     onClick={() => {
@@ -158,22 +143,55 @@ export default function Dashboard() {
               }}
             >
               <TimesheetCalendar
-                tasks={userTasks}
+                tasks={backlogTasks}
+                entries={entries}
                 activeUser={activeUser}
                 onEditTask={(task) => {
                   setEditingTask(task);
                   setIsTaskModalOpen(true);
                 }}
                 onDeleteTask={(id) => remove(id)}
+
+                /* ===== BACKLOG → CALENDÁRIO ===== */
+                onTaskScheduled={async ({ task, entry }) => {
+                  await createEntry({
+                    ...entry,
+                    userId: activeUser,
+                  });
+
+                  await update(task.id, {
+                    status: 'scheduled',
+                    userId: activeUser,
+                  });
+
+                  await Promise.all([
+                    reloadEntries(),
+                    reloadTasks(),
+                  ]);
+                }}
+
+                /* ===== CALENDÁRIO → BACKLOG ===== */
+                onTaskUnscheduled={async ({ taskId, entryId }) => {
+                  // 1) OPTIMISTIC UPDATE — task volta IMEDIATAMENTE
+                  await update(taskId, {
+                    status: 'backlog',
+                    userId: activeUser,
+                  });
+
+                  // 2) backend em paralelo
+                  await removeEntry(entryId);
+
+                  // 3) sincroniza depois (segurança)
+                  await Promise.all([reloadEntries(), reloadTasks()]);
+                }}
+
               />
             </Card>
           </Col>
         </Row>
       </Layout>
 
-      {/* =========================
-          MODAL TASK
-         ========================= */}
+      {/* ================= MODAL TASK ================= */}
       <TaskModal
         open={isTaskModalOpen}
         initialValues={editingTask}
@@ -181,28 +199,29 @@ export default function Dashboard() {
           setIsTaskModalOpen(false);
           setEditingTask(null);
         }}
-        onSubmit={(values) => {
+        onSubmit={async (values) => {
           const payload = {
             ...values,
-            user_id: activeUser,
+            userId: activeUser,
+            status: 'backlog',
           };
 
           if (editingTask) {
-            update(editingTask.id, payload);
+            await update(editingTask.id, payload);
           } else {
-            create(payload);
+            await create(payload);
           }
+
+          await reloadTasks();
 
           setIsTaskModalOpen(false);
           setEditingTask(null);
         }}
       />
 
-      {/* =========================
-          MODAL REPORT
-         ========================= */}
+      {/* ================= MODAL REPORT ================= */}
       <Modal
-        title="Enviar relatório para SevenSys"
+        title="Enviar relatório"
         open={isReportModalOpen}
         confirmLoading={sendingReport}
         onCancel={() => setIsReportModalOpen(false)}
@@ -212,9 +231,6 @@ export default function Dashboard() {
         <Form
           form={reportForm}
           layout="vertical"
-          initialValues={{
-            format: 'pdf+csv',
-          }}
           onFinish={async (values) => {
             const [start, end] = values.period;
 
@@ -231,29 +247,24 @@ export default function Dashboard() {
           }}
         >
           <Form.Item
-            label="Email remetente"
             name="senderEmail"
-            rules={[
-              { required: true, message: 'Informe o email' },
-              { type: 'email', message: 'Email inválido' },
-            ]}
+            label="Email"
+            rules={[{ required: true }]}
           >
-            <Input placeholder="seu@email.com" />
+            <Input />
           </Form.Item>
 
           <Form.Item
-            label="Período"
             name="period"
-            rules={[
-              { required: true, message: 'Informe o período' },
-            ]}
+            label="Período"
+            rules={[{ required: true }]}
           >
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
 
           <Form.Item
-            label="Formato"
             name="format"
+            label="Formato"
             rules={[{ required: true }]}
           >
             <Select

@@ -37,7 +37,6 @@ export function TaskTable(props: {
       pagination={{ pageSize: 8 }}
       size="small"
       columns={[
-        /* ===== TAREFA (NOME) ===== */
         {
           title: 'Tarefa',
           key: 'title',
@@ -46,22 +45,23 @@ export function TaskTable(props: {
             <strong>{task.title ?? '-'}</strong>
           ),
         },
-
-        /* ===== DURAÇÃO ===== */
         {
           title: 'Duração',
           key: 'duration',
           width: 120,
-          render: (_, task) => (
-            <Tag color="blue">
-              {renderDuration(
-                task.defaultDuration ?? task.default_duration
-              )}
-            </Tag>
-          ),
-        },
+          render: (_, task) => {
+            const duration =
+              task.defaultDuration ??
+              task.default_duration ??
+              null;
 
-        /* ===== STATUS ===== */
+            return (
+              <Tag color="blue">
+                {renderDuration(duration)}
+              </Tag>
+            );
+          },
+        },
         {
           title: 'Status',
           dataIndex: 'status',
@@ -69,8 +69,6 @@ export function TaskTable(props: {
           width: 120,
           render: (s) => <Tag>{s}</Tag>,
         },
-
-        /* ===== AÇÕES ===== */
         {
           title: 'Ações',
           key: 'actions',
@@ -78,7 +76,10 @@ export function TaskTable(props: {
           render: (_, task) => (
             <Space>
               {props.onEdit && (
-                <Button size="small" onClick={() => props.onEdit!(task)}>
+                <Button
+                  size="small"
+                  onClick={() => props.onEdit!(task)}
+                >
                   Editar
                 </Button>
               )}

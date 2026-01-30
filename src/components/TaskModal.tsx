@@ -7,7 +7,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSubmit: (values: any) => void;
-  initialValues?: any;
+  initialValues?: any | null;
 };
 
 export function TaskModal({
@@ -19,16 +19,33 @@ export function TaskModal({
   const [form] = Form.useForm();
   const { projects } = useProjects();
 
-  // 🔄 garante reload correto ao editar
+  /**
+   * =========================
+   * LOAD VALUES (EDIT)
+   * =========================
+   */
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+
+    if (initialValues) {
+      form.setFieldsValue({
+        title: initialValues.title ?? '',
+        project: initialValues.project ?? '',
+        status: initialValues.status ?? 'backlog',
+        billable: initialValues.billable ?? true,
+        defaultDuration:
+          initialValues.defaultDuration ??
+          initialValues.default_duration ??
+          '8h',
+      });
+    } else {
+      // CREATE
       form.setFieldsValue({
         title: '',
         project: '',
         status: 'backlog',
         billable: true,
         defaultDuration: '8h',
-        ...initialValues,
       });
     }
   }, [open, initialValues, form]);
@@ -37,12 +54,12 @@ export function TaskModal({
     <Modal
       title={initialValues ? 'Editar tarefa' : 'Nova tarefa'}
       open={open}
+      destroyOnClose
       onCancel={() => {
         form.resetFields();
         onClose();
       }}
       onOk={() => form.submit()}
-      destroyOnHidden
     >
       <Form
         form={form}
@@ -56,12 +73,14 @@ export function TaskModal({
         <Form.Item
           label="Título"
           name="title"
-          rules={[{ required: true, message: 'Informe o título' }]}
+          rules={[
+            { required: true, message: 'Informe o título' },
+          ]}
         >
           <Input placeholder="Ex: Ajustar integração RM" />
         </Form.Item>
 
-        {/* ===== PROJETO (PRÉ-FIXADO) ===== */}
+        {/* ===== PROJETO ===== */}
         <Form.Item label="Projeto" name="project">
           <Select
             showSearch
@@ -99,11 +118,13 @@ export function TaskModal({
           <Switch />
         </Form.Item>
 
-        {/* ===== DURAÇÃO PADRÃO ===== */}
+        {/* ===== DURAÇÃO ===== */}
         <Form.Item
           label="Duração padrão"
           name="defaultDuration"
-          rules={[{ required: true, message: 'Informe a duração' }]}
+          rules={[
+            { required: true, message: 'Informe a duração' },
+          ]}
         >
           <Select
             options={[
