@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Button, Space, Tooltip, Popconfirm } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
+/* ================= TYPES ================= */
+
 type Task = {
   id: string;
   title: string;
@@ -36,6 +38,19 @@ type Props = {
   onTaskUnscheduled: (args: { taskId: string; entryId: string }) => Promise<void>;
 };
 
+/* ================= STYLES ================= */
+
+const STATUS_STYLES: Record<string, { bg: string }> = {
+  backlog: { bg: 'rgb(255 247 174 / 31%)' }, // bege
+  scheduled: { bg: 'rgb(7 96 166)' },             // azul
+  done: { bg: '#f6ffed' },                  // verde
+  blocked: { bg: '#fff1f0' },               // vermelho
+};
+
+const SHADOW = '4px 4px 17px -7px rgba(0,0,0,0.75)';
+
+/* ================= HELPERS ================= */
+
 function durationToMinutes(d?: string): number {
   const map: Record<string, number> = {
     '30m': 30,
@@ -52,25 +67,21 @@ function durationToMinutes(d?: string): number {
   return map[d ?? ''] ?? 60;
 }
 
-/**
- * Soma horas por dia (YYYY-MM-DD)
- */
 function getHoursByDay(entries: TimeEntry[]) {
   const map: Record<string, number> = {};
 
   for (const e of entries) {
     if (!e.start || !e.end) continue;
-
     const day = e.start.slice(0, 10);
-    const start = new Date(e.start).getTime();
-    const end = new Date(e.end).getTime();
-
-    const hours = (end - start) / 1000 / 60 / 60;
+    const hours =
+      (new Date(e.end).getTime() - new Date(e.start).getTime()) / 36e5;
     map[day] = (map[day] ?? 0) + hours;
   }
 
   return map;
 }
+
+/* ================= COMPONENT ================= */
 
 export function TimesheetCalendar({
   tasks,
@@ -83,134 +94,136 @@ export function TimesheetCalendar({
   const externalRef = useRef<HTMLDivElement | null>(null);
   const draggableRef = useRef<Draggable | null>(null);
 
-  /**
-   * DRAG DA LISTA → CALENDÁRIO
-   */
+  /* ===== DRAG BACKLOG → CALENDAR ===== */
   useEffect(() => {
     if (!externalRef.current || draggableRef.current) return;
 
     draggableRef.current = new Draggable(externalRef.current, {
       itemSelector: '.external-task',
-      eventData: (el) => {
-        const taskId = el.getAttribute('data-task-id')!;
-        const title = el.getAttribute('data-title')!;
-        const duration = el.getAttribute('data-duration') ?? '1h';
-        const project = el.getAttribute('data-project') ?? '';
-
-        return {
-          title,
-          duration: { minutes: durationToMinutes(duration) },
-          extendedProps: {
-            taskId,
-            project,
-            defaultDuration: duration,
-            source: 'backlog',
-          },
-        };
-      },
+      eventData: (el) => ({
+        title: el.getAttribute('data-title')!,
+        duration: {
+          minutes: durationToMinutes(el.getAttribute('data-duration') ?? '1h'),
+        },
+        extendedProps: {
+          taskId: el.getAttribute('data-task-id')!,
+        },
+      }),
     });
   }, []);
 
-  /**
-   * EVENTOS DO CALENDÁRIO
-   */
+  /* ===== EVENTS ===== */
   const calendarEvents = useMemo(
     () =>
-      entries.map((e) => ({
-        id: e.id,
-        title: e.task_title,
-        start: e.start,
-        end: e.end,
-        extendedProps: {
-          taskId: e.taskId,
-          source: 'calendar',
-        },
-      })),
-    [entries]
+      entries.map((e) => {
+        const task = tasks.find((t) => t.id === e.taskId);
+        const status = task?.status ?? 'scheduled';
+        const style = STATUS_STYLES[status] ?? STATUS_STYLES.backlog;
+
+        return {
+          id: e.id,
+          title: e.task_title,
+          start: e.start,
+          end: e.end,
+          backgroundColor: style.bg,
+          borderColor: 'transparent',
+          extendedProps: {
+            taskId: e.taskId,
+            status,
+          },
+        };
+      }),
+    [entries, tasks]
   );
 
-  /**
-   * HORAS AGRUPADAS POR DIA
-   */
-  const hoursByDay = useMemo(
-    () => getHoursByDay(entries),
-    [entries]
-  );
+  const hoursByDay = useMemo(() => getHoursByDay(entries), [entries]);
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
-      {/* ===== BACKLOG ===== */}
+      {/* ================= BACKLOG ================= */}
       <div
         ref={externalRef}
         style={{
           width: 300,
           borderRight: '1px solid #f0f0f0',
-          padding: 12,
+          padding: '1%',
           background: '#fafafa',
           overflowY: 'auto',
         }}
       >
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            className="external-task"
-            data-task-id={task.id}
-            data-title={task.title}
-            data-duration={task.defaultDuration ?? '1h'}
-            data-project={task.project ?? ''}
-            style={{
-              marginTop: 8,
-              padding: 8,
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
-              background: '#fff',
-              cursor: 'grab',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{task.title}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>
-                  Projeto: {task.project ?? '-'}
-                </div>
-                <div style={{ fontSize: 12 }}>
-                  Duração: {task.defaultDuration ?? '1h'}
+        {tasks.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#8c8c8c', marginTop: 24 }}>
+            Nenhuma tarefa disponível para uso.
+          </div>
+        ) : (
+          tasks.map((task) => {
+            const style = STATUS_STYLES[task.status] ?? STATUS_STYLES.backlog;
+
+            return (
+              <div
+                key={task.id}
+                className="external-task"
+                data-task-id={task.id}
+                data-title={task.title}
+                data-duration={task.defaultDuration ?? '1h'}
+                style={{
+                  marginTop: 8,
+                  padding: 10,
+                  borderRadius: 8,
+                  background: style.bg,
+                  cursor: 'grab',
+                  boxShadow: SHADOW,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{task.title}</div>
+                    <div style={{ fontSize: 12, color: '#666' }}>
+                      Projeto: {task.project ?? '-'}
+                    </div>
+                    <div style={{ fontSize: 12 }}>
+                      Duração: {task.defaultDuration ?? '1h'}
+                    </div>
+                  </div>
+
+                  <Space size={4}>
+                    <Tooltip title="Editar">
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTask(task);
+                        }}
+                      />
+                    </Tooltip>
+
+                    <Popconfirm
+                      title="Excluir task?"
+                      onConfirm={() => onDeleteTask(task.id)}
+                    >
+                      <Button
+                        size="small"
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Popconfirm>
+                  </Space>
                 </div>
               </div>
-
-              <Space size={4}>
-                <Tooltip title="Editar">
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<EditOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditTask(task);
-                    }}
-                  />
-                </Tooltip>
-
-                <Popconfirm title="Excluir task?" onConfirm={() => onDeleteTask(task.id)}>
-                  <Button
-                    size="small"
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Popconfirm>
-              </Space>
-            </div>
-          </div>
-        ))}
+            );
+          })
+        )}
       </div>
 
-      {/* ===== CALENDÁRIO ===== */}
+      {/* ================= CALENDAR ================= */}
       <div style={{ flex: 1, padding: 16 }}>
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
+          initialView="timeGridWeek"
           locale={ptBrLocale}
           height="100%"
           editable
@@ -222,64 +235,62 @@ export function TimesheetCalendar({
             right: 'dayGridMonth,timeGridWeek,timeGridDay',
           }}
 
-          /**
-           * MOSTRA TOTAL DE HORAS NO CANTO DO DIA
-           */
-          dayCellDidMount={(info) => {
-            const dateStr = info.date.toISOString().slice(0, 10);
-            const hours = hoursByDay[dateStr];
-            if (!hours) return;
+          /* SHADOW NO EVENTO */
+          eventDidMount={(info) => {
+            info.el.style.boxShadow = SHADOW;
+            info.el.style.borderRadius = '6px';
+          }}
 
+          dayCellDidMount={(info) => {
+            const h = hoursByDay[info.date.toISOString().slice(0, 10)];
+            if (!h) return;
             const el = document.createElement('div');
-            el.innerText = `${hours.toFixed(1)}h`;
+            el.innerText = `${h.toFixed(1)}h`;
             el.style.position = 'absolute';
             el.style.top = '4px';
             el.style.right = '6px';
             el.style.fontSize = '11px';
             el.style.fontWeight = '600';
-            el.style.color = hours >= 8 ? '#d4380d' : '#1677ff';
-
             info.el.style.position = 'relative';
             info.el.appendChild(el);
           }}
 
-          /** BACKLOG → CALENDÁRIO */
           eventReceive={async (info) => {
-            const taskId = info.event.extendedProps.taskId as string;
-            const task = tasks.find((t) => t.id === taskId);
+            const task = tasks.find(
+              (t) => t.id === info.event.extendedProps.taskId
+            );
             if (!task) return;
 
             await onTaskScheduled({
               task,
               entry: {
-                taskId,
+                taskId: task.id,
                 start: info.event.start?.toISOString(),
                 end: info.event.end?.toISOString(),
               },
             });
           }}
 
-          /** CALENDÁRIO → BACKLOG */
           eventDragStop={async (info) => {
-            const calendarEl = document.querySelector('.fc-view-harness');
-            if (!calendarEl) return;
+            const rect = document
+              .querySelector('.fc-view-harness')
+              ?.getBoundingClientRect();
+            if (!rect) return;
 
-            const rect = calendarEl.getBoundingClientRect();
             const { clientX, clientY } = info.jsEvent;
-
-            const droppedOutside =
-              clientX < rect.left ||
-              clientX > rect.right ||
-              clientY < rect.top ||
-              clientY > rect.bottom;
-
-            if (!droppedOutside) return;
-
-            const entryId = info.event.id;
-            const taskId = info.event.extendedProps.taskId as string;
+            if (
+              clientX >= rect.left &&
+              clientX <= rect.right &&
+              clientY >= rect.top &&
+              clientY <= rect.bottom
+            )
+              return;
 
             info.event.remove();
-            await onTaskUnscheduled({ taskId, entryId });
+            await onTaskUnscheduled({
+              taskId: info.event.extendedProps.taskId,
+              entryId: info.event.id,
+            });
           }}
         />
       </div>
