@@ -144,7 +144,7 @@ export function TimesheetCalendar({
       <div
         ref={externalRef}
         style={{
-          width: 300,
+          width: 350,
           borderRight: '1px solid #f0f0f0',
           padding: '1%',
           background: '#fafafa',

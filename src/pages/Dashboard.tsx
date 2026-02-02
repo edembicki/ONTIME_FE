@@ -90,11 +90,6 @@ export default function Dashboard() {
       await createSheet(values);
       await reloadSheets();
 
-      // ✅ seleciona imediatamente a sheet nova (sem effect)
-      // se seu backend retornar { id }, isso já funciona:
-      // const created = await createSheet(values);
-      // setActiveSheetId(created?.id);
-
       setIsSheetModalOpen(false);
       sheetForm.resetFields();
       message.success('Sheet criada');
@@ -120,7 +115,7 @@ export default function Dashboard() {
       const [start, end] = values.period;
 
       const result = await sendReport({
-        userId: resolvedSheetId, // ✅ string garantido
+        userId: resolvedSheetId,
         senderEmail: values.senderEmail,
         periodStart: dayjs(start).format('YYYY-MM-DD'),
         periodEnd: dayjs(end).format('YYYY-MM-DD'),
@@ -154,7 +149,7 @@ export default function Dashboard() {
   return (
     <>
       <Layout style={{ height: '100vh', padding: 16, background: '#e6e6f0' }}>
-        <img src="/logo.svg" width={360} style={{ marginBottom: 8 }} />
+        <img src="/logo.svg" width={460} style={{ marginBottom: -18 }} />
 
         <Row gutter={16} style={{ height: '100%', padding: '1%' }}>
           <Col flex="auto" style={{ height: '100%' }}>
@@ -187,7 +182,7 @@ export default function Dashboard() {
               extra={
                 <Space>
                   <Button disabled={!hasActiveSheet} onClick={handleOpenReportModal}>
-                    Enviar para SevenSys
+                    Emitir relatório
                   </Button>
 
                   <Button
