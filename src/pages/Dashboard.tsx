@@ -25,6 +25,8 @@ import { TaskModal } from '../components/TaskModal';
 
 const { RangePicker } = DatePicker;
 
+/* ================= HELPERS ================= */
+
 function downloadBase64File(base64: string, mime: string, filename: string) {
   const a = document.createElement('a');
   a.href = `data:${mime};base64,${base64}`;
@@ -32,17 +34,18 @@ function downloadBase64File(base64: string, mime: string, filename: string) {
   a.click();
 }
 
+/* ================= COMPONENT ================= */
+
 export default function Dashboard() {
   /* ================= SHEETS ================= */
   const { sheets, create: createSheet, reload: reloadSheets } = useSheets();
 
-  // ✅ sem null pra evitar TS chato
-  const [activeSheetId, setActiveSheetId] = useState<string | undefined>(undefined);
+  const [activeSheetId, setActiveSheetId] = useState<string | undefined>();
 
-  // ✅ resolve sheet ativa sem useEffect (evita cascading renders)
-  const resolvedSheetId = useMemo(() => {
-    return activeSheetId ?? sheets[0]?.id;
-  }, [activeSheetId, sheets]);
+  const resolvedSheetId = useMemo(
+    () => activeSheetId ?? sheets[0]?.id,
+    [activeSheetId, sheets]
+  );
 
   const hasActiveSheet = !!resolvedSheetId;
 
@@ -56,9 +59,7 @@ export default function Dashboard() {
     update,
     remove,
     reload: reloadTasks,
-  } = useTasks({
-    userId: resolvedSheetId, // ✅ undefined quando não tem sheet
-  });
+  } = useTasks({ userId: resolvedSheetId });
 
   /* =============== TIME ENTRIES ============== */
   const {
@@ -80,7 +81,9 @@ export default function Dashboard() {
   /* ============== BACKLOG TASKS ============== */
   const backlogTasks = useMemo(() => {
     if (!resolvedSheetId) return [];
-    return tasks.filter((t) => t.userId === resolvedSheetId && t.status === 'backlog');
+    return tasks.filter(
+      (t) => t.userId === resolvedSheetId && t.status === 'backlog'
+    );
   }, [tasks, resolvedSheetId]);
 
   /* ================= ACTIONS ================= */
@@ -89,7 +92,6 @@ export default function Dashboard() {
     async (values: any) => {
       await createSheet(values);
       await reloadSheets();
-
       setIsSheetModalOpen(false);
       sheetForm.resetFields();
       message.success('Sheet criada');
@@ -105,6 +107,7 @@ export default function Dashboard() {
     setIsReportModalOpen(true);
   }, [resolvedSheetId]);
 
+  /* ===== CORREÇÃO DEFINITIVA DO RELATÓRIO ===== */
   const handleSendReport = useCallback(
     async (values: any) => {
       if (!resolvedSheetId) {
@@ -113,17 +116,22 @@ export default function Dashboard() {
       }
 
       const [start, end] = values.period;
+      const format = values.format;
 
       const result = await sendReport({
         userId: resolvedSheetId,
         senderEmail: values.senderEmail,
         periodStart: dayjs(start).format('YYYY-MM-DD'),
         periodEnd: dayjs(end).format('YYYY-MM-DD'),
-        format: values.format,
+        format,
       });
 
-      // ✅ Auto-download sem useEffect
-      if (result?.files?.pdfBase64) {
+      if (!result?.files) {
+        message.error('Nenhum arquivo retornado');
+        return;
+      }
+
+      if ((format === 'pdf' || format === 'pdf+csv') && result.files.pdfBase64) {
         downloadBase64File(
           result.files.pdfBase64,
           'application/pdf',
@@ -131,7 +139,7 @@ export default function Dashboard() {
         );
       }
 
-      if (result?.files?.csvBase64) {
+      if ((format === 'csv' || format === 'pdf+csv') && result.files.csvBase64) {
         downloadBase64File(
           result.files.csvBase64,
           'text/csv',
@@ -146,6 +154,8 @@ export default function Dashboard() {
     [resolvedSheetId, sendReport, reportForm]
   );
 
+  /* ================= RENDER ================= */
+
   return (
     <>
       <Layout style={{ height: '100vh', padding: 16, background: '#e6e6f0' }}>
@@ -154,18 +164,14 @@ export default function Dashboard() {
         <Row gutter={16} style={{ height: '100%', padding: '1%' }}>
           <Col flex="auto" style={{ height: '100%' }}>
             <Card
-              style={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
+              style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               title={
                 <Space>
                   <Select
                     style={{ minWidth: 280 }}
                     placeholder="Selecione uma sheet"
                     value={resolvedSheetId}
-                    onChange={(v) => setActiveSheetId(v)}
+                    onChange={setActiveSheetId}
                     options={sheets.map((s) => ({
                       value: s.id,
                       label: s.name,
@@ -173,7 +179,6 @@ export default function Dashboard() {
                     allowClear
                     onClear={() => setActiveSheetId(undefined)}
                   />
-
                   <Button type="primary" onClick={() => setIsSheetModalOpen(true)}>
                     Nova Sheet
                   </Button>
@@ -184,7 +189,6 @@ export default function Dashboard() {
                   <Button disabled={!hasActiveSheet} onClick={handleOpenReportModal}>
                     Emitir relatório
                   </Button>
-
                   <Button
                     type="primary"
                     disabled={!hasActiveSheet}
@@ -197,48 +201,37 @@ export default function Dashboard() {
                   </Button>
                 </Space>
               }
-              bodyStyle={{
-                flex: 1,
-                minHeight: 0,
-                padding: 0,
-                overflow: 'hidden',
+              styles={{
+                body: {
+                  flex: 1,
+                  minHeight: 0,
+                  padding: 0,
+                  overflow: 'hidden',
+                },
               }}
             >
               {hasActiveSheet ? (
                 <TimesheetCalendar
                   tasks={backlogTasks}
                   entries={entries}
-                  activeUser={resolvedSheetId} // ✅ string garantido
+                  activeUser={resolvedSheetId}
                   onEditTask={(task) => {
                     setEditingTask(task);
                     setIsTaskModalOpen(true);
                   }}
-                  onDeleteTask={(id) => remove(id)}
-                  /* ===== BACKLOG → CALENDÁRIO ===== */
+                  onDeleteTask={remove}
                   onTaskScheduled={async ({ task, entry }) => {
                     if (!resolvedSheetId) return;
 
-                    await createEntry({
-                      ...entry,
-                      userId: resolvedSheetId,
-                    });
-
-                    await update(task.id, {
-                      status: 'scheduled',
-                      userId: resolvedSheetId,
-                    });
+                    await createEntry({ ...entry, userId: resolvedSheetId });
+                    await update(task.id, { status: 'scheduled', userId: resolvedSheetId });
 
                     await Promise.all([reloadEntries(), reloadTasks()]);
                   }}
-                  /* ===== CALENDÁRIO → BACKLOG ===== */
                   onTaskUnscheduled={async ({ taskId, entryId }) => {
                     if (!resolvedSheetId) return;
 
-                    await update(taskId, {
-                      status: 'backlog',
-                      userId: resolvedSheetId,
-                    });
-
+                    await update(taskId, { status: 'backlog', userId: resolvedSheetId });
                     await removeEntry(entryId);
 
                     await Promise.all([reloadEntries(), reloadTasks()]);
@@ -265,13 +258,12 @@ export default function Dashboard() {
         open={isSheetModalOpen}
         onCancel={() => setIsSheetModalOpen(false)}
         onOk={() => sheetForm.submit()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={sheetForm} layout="vertical" onFinish={handleCreateSheet}>
           <Form.Item name="name" label="Nome" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-
           <Form.Item name="description" label="Descrição">
             <Input.TextArea rows={3} />
           </Form.Item>
@@ -294,6 +286,7 @@ export default function Dashboard() {
 
           const payload = {
             ...values,
+            title: String(values.title ?? ''),
             userId: resolvedSheetId,
             status: 'backlog',
           };
@@ -305,7 +298,6 @@ export default function Dashboard() {
           }
 
           await reloadTasks();
-
           setIsTaskModalOpen(false);
           setEditingTask(null);
         }}
@@ -318,7 +310,7 @@ export default function Dashboard() {
         confirmLoading={sendingReport}
         onCancel={() => setIsReportModalOpen(false)}
         onOk={() => reportForm.submit()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={reportForm} layout="vertical" onFinish={handleSendReport}>
           <Form.Item name="senderEmail" label="Email" rules={[{ required: true }]}>

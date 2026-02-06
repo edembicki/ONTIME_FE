@@ -78,3 +78,117 @@ body,
 .ant-layout {
   min-height: 100%;
 }
+
+.fc-task-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+}
+
+.fc-task-time {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+
+/* bullets */
+.fc-task-content ul {
+  padding-left: 16px;
+  margin: 4px 0 0;
+}
+
+.fc-task-content li {
+  margin-bottom: 2px;
+}
+
+/* 🔥 GRADIENTE + "…" */
+.fc-task-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+
+  height: 22px;
+  background: linear-gradient(
+    rgba(7, 96, 166, 0),
+    rgba(7, 96, 166, 1)
+  );
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+
+.fc-timegrid-event .fc-event-main {
+    padding: 3% 3% 0px;
+}
+
+.fc-task-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* 👈 ocupa todo o card */
+}
+
+/* horário fixo */
+.fc-task-time {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.85;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+/* 🔥 CONTEÚDO PROPORCIONAL */
+.fc-task-content {
+  font-size: 12px;
+  line-height: 1.35;
+
+  flex: 1;              /* 👈 ocupa o resto do espaço */
+  overflow: hidden;     /* 👈 corta o excesso */
+}
+
+/* bullets */
+.fc-task-content ul {
+  padding-left: 16px;
+  margin: 4px 0 0;
+}
+
+.fc-task-content li {
+  margin-bottom: 2px;
+}
+
+/* fade + … */
+.fc-task-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+
+  height: 22px;
+  background: linear-gradient(
+    rgba(7, 96, 166, 0),
+    rgba(7, 96, 166, 1)
+  );
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.tox-statusbar__branding {
+  display: none !important;
+}

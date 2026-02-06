@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Modal, Form, Input, Select, Switch } from 'antd';
-import { useEffect } from 'react';
+import { Modal, Form, Select } from 'antd';
+import { useEffect, useState } from 'react';
 import { useProjects } from '../hooks/useProjects';
+import { Editor } from '@tinymce/tinymce-react';
 
 type Props = {
   open: boolean;
@@ -19,44 +20,42 @@ export function TaskModal({
   const [form] = Form.useForm();
   const { projects } = useProjects();
 
+  // 🔒 ÚNICA fonte da verdade do título
+  const [htmlTitle, setHtmlTitle] = useState<string>('');
+
   /**
    * =========================
-   * LOAD VALUES (EDIT)
+   * INIT (APENAS AO ABRIR)
    * =========================
    */
   useEffect(() => {
     if (!open) return;
 
-    if (initialValues) {
-      form.setFieldsValue({
-        title: initialValues.title ?? '',
-        project: initialValues.project ?? '',
-        status: initialValues.status ?? 'backlog',
-        billable: initialValues.billable ?? true,
-        defaultDuration:
-          initialValues.defaultDuration ??
-          initialValues.default_duration ??
-          '8h',
-      });
-    } else {
-      // CREATE
-      form.setFieldsValue({
-        title: '',
-        project: '',
-        status: 'backlog',
-        billable: true,
-        defaultDuration: '8h',
-      });
-    }
-  }, [open, initialValues, form]);
+    const title = String(initialValues?.title ?? '');
+    setHtmlTitle(title);
+
+    form.setFieldsValue({
+      project: initialValues?.project ?? '',
+      status: initialValues?.status ?? 'backlog',
+      billable: initialValues?.billable ?? true,
+      defaultDuration:
+        initialValues?.defaultDuration ??
+        initialValues?.default_duration ??
+        '8h',
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   return (
     <Modal
       title={initialValues ? 'Editar tarefa' : 'Nova tarefa'}
       open={open}
-      destroyOnClose
+      destroyOnHidden
+      width={700}
       onCancel={() => {
         form.resetFields();
+        setHtmlTitle('');
         onClose();
       }}
       onOk={() => form.submit()}
@@ -65,22 +64,37 @@ export function TaskModal({
         form={form}
         layout="vertical"
         onFinish={(values) => {
-          onSubmit(values);
+          onSubmit({
+            ...values,
+            title: htmlTitle, // 🔥 SEMPRE string HTML
+          });
+
           form.resetFields();
+          setHtmlTitle('');
         }}
       >
-        {/* ===== TÍTULO ===== */}
+        {/* ================= TÍTULO (FORA DO FORM) ================= */}
         <Form.Item
-          label="Título"
-          name="title"
-          rules={[
-            { required: true, message: 'Informe o título' },
-          ]}
+          label="Descrição"
+          validateStatus={!htmlTitle ? 'error' : ''}
         >
-          <Input placeholder="Ex: Ajustar integração RM" />
+          <Editor
+            apiKey="tfh65musru6n0ndx9t3v7i8u0jy9znwc9zeumjst03w34t1m"
+            value={htmlTitle}
+            onEditorChange={(content) => setHtmlTitle(content)}
+            init={{
+              height: 200,
+              menubar: false,
+              plugins: ['lists', 'link'],
+              toolbar:
+                'bold italic | bullist numlist | removeformat',
+              content_style:
+                'body { font-family: Arial, sans-serif; font-size:14px }',
+            }}
+          />
         </Form.Item>
 
-        {/* ===== PROJETO ===== */}
+        {/* ================= PROJETO ================= */}
         <Form.Item label="Projeto" name="project">
           <Select
             showSearch
@@ -98,33 +112,11 @@ export function TaskModal({
           />
         </Form.Item>
 
-        {/* ===== STATUS ===== */}
-        <Form.Item label="Status" name="status">
-          <Select
-            options={[
-              { value: 'backlog', label: 'Backlog' },
-              { value: 'in_progress', label: 'Em andamento' },
-              { value: 'done', label: 'Concluída' },
-            ]}
-          />
-        </Form.Item>
-
-        {/* ===== FATURÁVEL ===== */}
-        <Form.Item
-          label="Faturável"
-          name="billable"
-          valuePropName="checked"
-        >
-          <Switch />
-        </Form.Item>
-
-        {/* ===== DURAÇÃO ===== */}
+        {/* ================= DURAÇÃO ================= */}
         <Form.Item
           label="Duração padrão"
           name="defaultDuration"
-          rules={[
-            { required: true, message: 'Informe a duração' },
-          ]}
+          rules={[{ required: true, message: 'Informe a duração' }]}
         >
           <Select
             options={[

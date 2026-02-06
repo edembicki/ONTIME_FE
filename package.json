@@ -15,6 +15,7 @@
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
+    "@tinymce/tinymce-react": "^6.3.0",
     "antd": "^6.2.1",
     "axios": "^1.13.2",
     "dayjs": "^1.11.19",

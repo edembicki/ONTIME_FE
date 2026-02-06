@@ -12,7 +12,7 @@ import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
 type Task = {
   id: string;
-  title: string;
+  title: string; // HTML
   project?: string | null;
   status: string;
   defaultDuration?: string;
@@ -21,7 +21,7 @@ type Task = {
 type TimeEntry = {
   id: string;
   taskId: string;
-  task_title: string;
+  task_title: string; // HTML
   start: string;
   end: string;
 };
@@ -41,15 +41,21 @@ type Props = {
 /* ================= STYLES ================= */
 
 const STATUS_STYLES: Record<string, { bg: string }> = {
-  backlog: { bg: 'rgb(255 247 174 / 31%)' }, // bege
-  scheduled: { bg: 'rgb(7 96 166)' },             // azul
-  done: { bg: '#f6ffed' },                  // verde
-  blocked: { bg: '#fff1f0' },               // vermelho
+  backlog: { bg: 'rgb(255 247 174 / 31%)' },
+  scheduled: { bg: 'rgb(7 96 166)' },
+  done: { bg: '#f6ffed' },
+  blocked: { bg: '#fff1f0' },
 };
 
 const SHADOW = '4px 4px 17px -7px rgba(0,0,0,0.75)';
 
 /* ================= HELPERS ================= */
+
+function stripHtml(html: string): string {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+}
 
 function durationToMinutes(d?: string): number {
   const map: Record<string, number> = {
@@ -101,12 +107,13 @@ export function TimesheetCalendar({
     draggableRef.current = new Draggable(externalRef.current, {
       itemSelector: '.external-task',
       eventData: (el) => ({
-        title: el.getAttribute('data-title')!,
+        title: stripHtml(el.getAttribute('data-title') || ''),
         duration: {
           minutes: durationToMinutes(el.getAttribute('data-duration') ?? '1h'),
         },
         extendedProps: {
           taskId: el.getAttribute('data-task-id')!,
+          html: el.getAttribute('data-title')!, // 👈 HTML
         },
       }),
     });
@@ -122,7 +129,7 @@ export function TimesheetCalendar({
 
         return {
           id: e.id,
-          title: e.task_title,
+          title: stripHtml(e.task_title), // fallback
           start: e.start,
           end: e.end,
           backgroundColor: style.bg,
@@ -130,6 +137,7 @@ export function TimesheetCalendar({
           extendedProps: {
             taskId: e.taskId,
             status,
+            html: e.task_title, // 👈 HTML REAL
           },
         };
       }),
@@ -151,72 +159,69 @@ export function TimesheetCalendar({
           overflowY: 'auto',
         }}
       >
-        {tasks.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#8c8c8c', marginTop: 24 }}>
-            Nenhuma tarefa disponível para uso.
-          </div>
-        ) : (
-          tasks.map((task) => {
-            const style = STATUS_STYLES[task.status] ?? STATUS_STYLES.backlog;
+        {tasks.map((task) => {
+          const style = STATUS_STYLES[task.status] ?? STATUS_STYLES.backlog;
 
-            return (
-              <div
-                key={task.id}
-                className="external-task"
-                data-task-id={task.id}
-                data-title={task.title}
-                data-duration={task.defaultDuration ?? '1h'}
-                style={{
-                  marginTop: 8,
-                  padding: 10,
-                  borderRadius: 8,
-                  background: style.bg,
-                  cursor: 'grab',
-                  boxShadow: SHADOW,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }}>{task.title}</div>
-                    <div style={{ fontSize: 12, color: '#666' }}>
-                      Projeto: {task.project ?? '-'}
-                    </div>
-                    <div style={{ fontSize: 12 }}>
-                      Duração: {task.defaultDuration ?? '1h'}
-                    </div>
+          return (
+            <div
+              key={task.id}
+              className="external-task"
+              data-task-id={task.id}
+              data-title={task.title}
+              data-duration={task.defaultDuration ?? '1h'}
+              style={{
+                marginTop: 8,
+                padding: 10,
+                borderRadius: 8,
+                background: style.bg,
+                cursor: 'grab',
+                boxShadow: SHADOW,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{ fontWeight: 600 }}
+                    dangerouslySetInnerHTML={{ __html: task.title }}
+                  />
+                  <div style={{ fontSize: 12, color: '#666' }}>
+                    Projeto: {task.project ?? '-'}
                   </div>
-
-                  <Space size={4}>
-                    <Tooltip title="Editar">
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditTask(task);
-                        }}
-                      />
-                    </Tooltip>
-
-                    <Popconfirm
-                      title="Excluir task?"
-                      onConfirm={() => onDeleteTask(task.id)}
-                    >
-                      <Button
-                        size="small"
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Popconfirm>
-                  </Space>
+                  <div style={{ fontSize: 12 }}>
+                    Duração: {task.defaultDuration ?? '1h'}
+                  </div>
                 </div>
+
+                <Space size={4}>
+                  <Tooltip title="Editar">
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<EditOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTask(task);
+                      }}
+                    />
+                  </Tooltip>
+
+                  <Popconfirm
+                    title="Excluir task?"
+                    onConfirm={() => onDeleteTask(task.id)}
+                  >
+                    <Button
+                      size="small"
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Popconfirm>
+                </Space>
               </div>
-            );
-          })
-        )}
+            </div>
+          );
+        })}
       </div>
 
       {/* ================= CALENDAR ================= */}
@@ -228,17 +233,52 @@ export function TimesheetCalendar({
           height="100%"
           editable
           droppable
+          weekends={false}
+          expandRows
+          allDaySlot={false}
+          slotDuration="01:00:00"
+          slotLabelInterval="01:00"
+          nowIndicator
+          snapDuration="00:30:00"
           events={calendarEvents}
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+
+          /* 👇 RENDER HTML */
+          eventContent={(arg) => {
+            const html = arg.event.extendedProps.html;
+            const timeText = arg.timeText;
+
+            return {
+              html: `
+                <div class="fc-task-wrapper">
+                  <div class="fc-task-time">${timeText}</div>
+
+                  <div class="fc-task-content">
+                    ${html}
+                  </div>
+
+                  <div class="fc-task-fade">…</div>
+                </div>
+              `,
+            };
           }}
 
-          /* SHADOW NO EVENTO */
+
           eventDidMount={(info) => {
             info.el.style.boxShadow = SHADOW;
             info.el.style.borderRadius = '6px';
+
+            const start = info.event.start?.toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            const end = info.event.end?.toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+
+            info.el.title = `${stripHtml(
+              info.event.extendedProps.html
+            )}\n${start} - ${end}`;
           }}
 
           dayCellDidMount={(info) => {

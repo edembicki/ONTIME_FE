@@ -6,22 +6,40 @@ type UseTasksOptions = {
   userId?: string | null;
 };
 
+const VALID_STATUSES = [
+  'backlog',
+  'scheduled',
+  'in_progress',
+  'done',
+  'blocked',
+];
+
 function normalizeTask(t: any) {
+  const rawStatus = typeof t.status === 'string'
+    ? t.status.trim().toLowerCase()
+    : '';
+
+  const status = VALID_STATUSES.includes(rawStatus)
+    ? rawStatus
+    : 'backlog';
+
   return {
     id: t.id,
-    title: t.title,
+
+    // 🔒 GARANTIA ABSOLUTA
+    title: String(t.title ?? ''),
+
     description: t.description ?? null,
     project: t.project ?? null,
     billable: !!t.billable,
 
-    // 🔥 ISSO AQUI É O BUG
-    status: t.status ?? 'backlog',
+    // 🔥 FIX REAL DO BUG
+    status,
 
     defaultDuration:
       t.default_duration ?? t.defaultDuration ?? '8h',
 
     userId: t.user_id ?? t.userId,
-
     created_at: t.created_at,
     updated_at: t.updated_at,
   };
@@ -71,7 +89,10 @@ export function useTasks(options?: UseTasksOptions) {
 
       await api.post('/tasks', {
         ...task,
-        userId, // ✅ O BACKEND ESPERA ISSO
+        status: VALID_STATUSES.includes(task.status)
+          ? task.status
+          : 'backlog',
+        userId,
       });
 
       await load();
@@ -88,7 +109,10 @@ export function useTasks(options?: UseTasksOptions) {
 
       await api.put(`/tasks/${id}`, {
         ...task,
-        userId, // ✅ O BACKEND ESPERA ISSO
+        status: VALID_STATUSES.includes(task.status)
+          ? task.status
+          : 'backlog',
+        userId,
       });
 
       await load();

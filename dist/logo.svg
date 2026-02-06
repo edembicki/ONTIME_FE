@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="150" viewBox="0 0 720 200" role="img" aria-label="OnTimeTracker logo">
+          <defs>
+            <linearGradient id="ott-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1677ff"></stop>
+              <stop offset="100%" stop-color="#52c41a"></stop>
+            </linearGradient>
+            <filter id="ott-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.18"></feDropShadow>
+            </filter>
+          </defs>
+
+          <g transform="translate(36,24)">
+            <circle cx="76" cy="76" r="64" fill="none" stroke="url(#ott-grad)" stroke-width="14" filter="url(#ott-shadow)"></circle>
+            <circle cx="76" cy="76" r="52" fill="#ffffff" opacity="0.98"></circle>
+            <g stroke="#cfd8e3" stroke-width="3" stroke-linecap="round" opacity="0.9">
+              <line x1="76" y1="18" x2="76" y2="28"></line>
+              <line x1="76" y1="124" x2="76" y2="134"></line>
+              <line x1="18" y1="76" x2="28" y2="76"></line>
+              <line x1="124" y1="76" x2="134" y2="76"></line>
+              <line x1="34" y1="34" x2="41" y2="41"></line>
+              <line x1="111" y1="111" x2="118" y2="118"></line>
+              <line x1="111" y1="41" x2="118" y2="34"></line>
+              <line x1="34" y1="118" x2="41" y2="111"></line>
+            </g>
+
+            <g stroke="#111827" stroke-width="6" stroke-linecap="round">
+              <line x1="76" y1="76" x2="76" y2="44"></line>
+              <line x1="76" y1="76" x2="104" y2="90"></line>
+            </g>
+            <circle cx="76" cy="76" r="6" fill="#111827"></circle>
+
+            <g transform="translate(112,108)">
+              <circle cx="22" cy="22" r="20" fill="url(#ott-grad)"></circle>
+              <path d="M12 22.5l6.2 6.2L33 14.2" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+            </g>
+          </g>
+
+          <g transform="translate(200,74)">
+            <text x="0" y="0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="52" font-weight="800" fill="#111827">
+              OnTime
+              <tspan fill="url(#ott-grad)">Tracker</tspan>
+            </text>
+            <text x="2" y="40" font-family="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="16" font-weight="500" fill="#6b7280">
+              Track time. Stay on schedule.
+            </text>
+          </g>
+        </svg>
